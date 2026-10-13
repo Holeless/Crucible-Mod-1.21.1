@@ -1,6 +1,7 @@
 package com.crucible.client;
 
 import com.crucible.Crucible;
+import com.crucible.CrucibleManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -71,7 +72,7 @@ public class CrucibleScreen {
 
     private static final Section[][] EFFECTS = {CRUCIBLE_1, null, null};
 
-    /** Selected crucible, 1-3. Read this wherever you need it later. */
+    /** Selected crucible, 1-3. Mirrored into CrucibleManager.pendingLevel for the server side. */
     public static int level = 1;
 
     private static CrucibleButton button;
@@ -109,6 +110,7 @@ public class CrucibleScreen {
         }
 
         scroll = 0;
+        CrucibleManager.pendingLevel = level;
         button = new CrucibleButton();
         event.addListener(button);
 
@@ -287,6 +289,7 @@ public class CrucibleScreen {
                     b -> {
                         level = level % 3 + 1;
                         scroll = 0;
+                        CrucibleManager.pendingLevel = level;
                     }, DEFAULT_NARRATION);
         }
     }
