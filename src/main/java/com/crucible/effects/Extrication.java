@@ -17,7 +17,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
 /**
- * Extrication: hostile mobs can break wooden doors, and smash the boat or minecart you are riding.
+ * Extrication: hostile mobs can break wooden doors, and smash the boat or minecart you are riding,
+ * and smash any boat or minecart they are trapped in themselves.
  *
  * Doors: every hostile ground mob gets vanilla's {@link BreakDoorGoal} on any difficulty, and is allowed to
  * path through closed doors. Only wooden doors break, as in vanilla.
@@ -53,9 +54,8 @@ public final class Extrication {
             nav.setCanOpenDoors(true); // lets pathfinding route through closed doors
             mob.goalSelector.addGoal(1, new DoorGoal(mob));
         }
-        if (isMelee(mob)) {
-            mob.goalSelector.addGoal(1, new ExtricationVehicleGoal(mob));
-        }
+        // Every hostile gets this so it can break out of a vehicle; only melee mobs also go after yours.
+        mob.goalSelector.addGoal(0, new ExtricationVehicleGoal(mob, isMelee(mob)));
     }
 
     /** Vanilla door breaking, on every difficulty. */

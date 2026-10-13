@@ -24,7 +24,7 @@ import net.neoforged.neoforge.event.tick.LevelTickEvent;
  * Nocturne: phantoms spawn every night no matter how recently you slept, and also in caves.
  *
  * This is our own spawner, separate from vanilla's (which still runs). Every 30-60 seconds at night, each
- * player gets a vanilla-sized group of phantoms: high above them if they are under open sky, or out in the
+ * player gets a pair of phantoms: high above them if they are under open sky, or out in the
  * dark cave air around them if they are underground.
  */
 @EventBusSubscriber(modid = Crucible.MOD_ID)
@@ -33,6 +33,7 @@ public final class Nocturne {
     private static final int RANDOM_INTERVAL = 600;
     private static final int MAX_NEARBY = 8;         // phantom cap around a player
     private static final int ATTEMPTS = 16;
+    private static final int GROUP_SIZE = 2;        // phantoms per spawn
 
     private static int cooldown = 0;
 
@@ -80,7 +81,7 @@ public final class Nocturne {
         if (spot == null) return;
 
         DifficultyInstance difficulty = level.getCurrentDifficultyAt(spot);
-        int count = 1 + level.getDifficulty().getId();
+        int count = GROUP_SIZE;
         for (int i = 0; i < count; i++) {
             Phantom phantom = EntityType.PHANTOM.create(level);
             if (phantom == null) continue;

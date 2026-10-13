@@ -24,16 +24,19 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 /**
- * Snare: a spider that gets right up next to its target spins a cobweb onto the player's feet.
+ * Snare: a spider (cave spiders too, they are Spiders) that gets close to its target spins a cobweb onto the
+ * player's feet.
  *
- * Webs only go into empty air, at most one per spider every 3 seconds, and they dissolve after 30 seconds
- * so the world does not fill up with them.
+ * Reach scales with the spider's size: a normal spider webs you from about 1 block away, a cave spider from
+ * about 0.75. It checks 5 times a second and each check has a 40% chance, so being next to one for a second or
+ * two is almost always enough, but not guaranteed. Needs line of sight. At most one web per spider every 2
+ * seconds, only into air or replaceable blocks (grass, snow), and they dissolve after 30 seconds.
  */
 @EventBusSubscriber(modid = Crucible.MOD_ID)
 public final class Snare {
-    /** Center-to-center distance (blocks) at which a spider webs you. Spiders are 1.4 wide, so this is "touching". */
-    private static final double TRIGGER_DISTANCE = 1.5;
-    private static final int COOLDOWN = 60;
+    private static final int CHECK_INTERVAL = 4;      // ticks between checks
+    private static final float CHANCE = 0.4F;         // per check
+    private static final int COOLDOWN = 40;
     private static final int WEB_LIFETIME = 600;
 
     private record Web(ResourceKey<Level> dimension, BlockPos pos, long expires) {}
@@ -43,22 +46,33 @@ public final class Snare {
 
     private Snare() {}
 
+    /** Centre-to-centre distance: spider 2.2 blocks, cave spider 1.5. */
+    private static double triggerDistance(Spider spider) {
+        return 0.8 + spider.getBbWidth();
+    }
+
     @SubscribeEvent
     public static void onEntityTick(EntityTickEvent.Post event) {
         if (!(event.getEntity() instanceof Spider spider) || spider.level().isClientSide()) return;
-        if (spider.tickCount % 5 != 0) return;
+        if (spider.tickCount % CHECK_INTERVAL != 0 || !spider.isAlive()) return;
         if (!CrucibleManager.isActive(1)) return;
         if (!(spider.getTarget() instanceof ServerPlayer player) || !player.isAlive()) return;
         if (player.isCreative() || player.isSpectator()) return;
-        if (spider.distanceToSqr(player) > TRIGGER_DISTANCE * TRIGGER_DISTANCE) return;
+
+        double reach = triggerDistance(spider);
+        if (spider.distanceToSqr(player) > reach * reach) return;
+        if (!spider.getSensing().hasLineOfSight(player)) return;
 
         ServerLevel level = (ServerLevel) spider.level();
         long now = level.getGameTime();
         Long last = LAST_WEB.get(spider);
         if (last != null && now - last < COOLDOWN) return;
+        if (spider.getRandom().nextFloat() >= CHANCE) return;
 
         BlockPos pos = player.blockPosition();
-        if (!level.getBlockState(pos).isAir()) return;
+        BlockState there = level.getBlockState(pos);
+        boolean free = there.isAir() || (there.canBeReplaced() && there.getFluidState().isEmpty());
+        if (!free) return;
 
         BlockState web = Blocks.COBWEB.defaultBlockState();
         level.setBlockAndUpdate(pos, web);

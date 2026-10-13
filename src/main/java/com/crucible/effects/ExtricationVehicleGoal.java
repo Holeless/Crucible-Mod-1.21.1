@@ -13,8 +13,11 @@ import net.minecraft.world.entity.vehicle.Boat;
 import java.util.EnumSet;
 
 /**
- * When a hostile mob's target is riding a boat or minecart, the mob goes for the vehicle instead and
- * hits it until it breaks, which drops the rider out. Gives up for a few seconds if it cannot path to it.
+ * Breaks boats and minecarts, in two situations:
+ *
+ *  1. The mob is sitting in one (trapped). It hits the vehicle until it breaks, which frees it. Any hostile does this.
+ *  2. {@code melee} mobs only: the mob's target is riding one. It goes for the vehicle instead, which drops the
+ *     rider out. Gives up for a few seconds if it cannot path to it.
  */
 public class ExtricationVehicleGoal extends Goal {
     private static final int ATTACK_COOLDOWN = 20;
@@ -23,30 +26,39 @@ public class ExtricationVehicleGoal extends Goal {
     private static final float FALLBACK_DAMAGE = 3.0F;
 
     private final PathfinderMob mob;
+    private final boolean melee;
     private Entity vehicle;
     private int cooldown;
     private int repath;
     private int failedPaths;
     private long retryAt;
 
-    public ExtricationVehicleGoal(PathfinderMob mob) {
+    public ExtricationVehicleGoal(PathfinderMob mob, boolean melee) {
         this.mob = mob;
+        this.melee = melee;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
-    private static Entity vehicleOf(LivingEntity target) {
-        if (target == null) return null;
-        Entity v = target.getVehicle();
+    private static Entity breakable(Entity v) {
         return (v instanceof Boat || v instanceof AbstractMinecart) && v.isAlive() ? v : null;
+    }
+
+    /** The vehicle this mob is in, else (melee only) the one its target is in. */
+    private Entity findVehicle() {
+        Entity ridden = breakable(mob.getVehicle());
+        if (ridden != null) return ridden;
+        if (!melee) return null;
+
+        LivingEntity target = mob.getTarget();
+        if (!(target instanceof Player) || !target.isAlive()) return null;
+        return breakable(target.getVehicle());
     }
 
     @Override
     public boolean canUse() {
         if (!Extrication.enabled()) return false;
         if (mob.level().getGameTime() < retryAt) return false;
-        LivingEntity target = mob.getTarget();
-        if (!(target instanceof Player) || !target.isAlive()) return false;
-        vehicle = vehicleOf(target);
+        vehicle = findVehicle();
         return vehicle != null;
     }
 
@@ -56,7 +68,7 @@ public class ExtricationVehicleGoal extends Goal {
                 && failedPaths < MAX_FAILED_PATHS
                 && vehicle != null
                 && vehicle.isAlive()
-                && vehicleOf(mob.getTarget()) == vehicle;
+                && findVehicle() == vehicle;
     }
 
     @Override
@@ -81,11 +93,13 @@ public class ExtricationVehicleGoal extends Goal {
     @Override
     public void tick() {
         if (vehicle == null) return;
-        mob.getLookControl().setLookAt(vehicle, 30.0F, 30.0F);
         if (cooldown > 0) cooldown--;
 
+        boolean inside = mob.getVehicle() == vehicle;
+        if (!inside) mob.getLookControl().setLookAt(vehicle, 30.0F, 30.0F);
+
         double reach = mob.getBbWidth() * 2.0 * mob.getBbWidth() * 2.0 + vehicle.getBbWidth() + 1.0;
-        if (mob.distanceToSqr(vehicle) <= reach) {
+        if (inside || mob.distanceToSqr(vehicle) <= reach) {
             mob.getNavigation().stop();
             failedPaths = 0;
             if (cooldown <= 0) {

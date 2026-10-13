@@ -17,6 +17,9 @@ import java.util.EnumSet;
  * Makes an angered passive mob chase and bite its target. Highest priority, so it overrides panic/flee goals.
  * The target itself is set by {@link Vicious} when the pack is alerted.
  *
+ * A mob waits {@link #START_DELAY} ticks after getting angry before its first bite, so you never take
+ * instant damage for hitting something.
+ *
  * Horses are big, and vanilla's reach formula scales with body width, so they would bite from almost 3 blocks
  * away. They use a short fixed reach instead, so you can hit them first.
  */
@@ -24,6 +27,7 @@ public class ViciousGoal extends Goal {
     private static final double MAX_DISTANCE_SQR = 32.0 * 32.0;
     private static final int GIVE_UP_TICKS = 200; // 10 seconds without line of sight
     private static final int ATTACK_COOLDOWN = 20;
+    private static final int START_DELAY = 15;    // 0.75 s before the first bite
     private static final double HORSE_REACH_SQR = 2.0 * 2.0; // centre-to-centre, about 1 block between bodies
 
     private final Mob mob;
@@ -39,6 +43,7 @@ public class ViciousGoal extends Goal {
     @Override
     public boolean canUse() {
         if (!CrucibleManager.isActive(1)) return false;
+        if (!mob.isAlive()) return false;
         LivingEntity target = mob.getTarget();
         return target != null
                 && target.isAlive()
@@ -60,7 +65,7 @@ public class ViciousGoal extends Goal {
     @Override
     public void start() {
         unseen = 0;
-        cooldown = 0;
+        cooldown = START_DELAY;
         repath = 0;
         mob.setAggressive(true);
     }
@@ -75,7 +80,7 @@ public class ViciousGoal extends Goal {
     @Override
     public void tick() {
         LivingEntity target = mob.getTarget();
-        if (target == null) return;
+        if (target == null || !mob.isAlive() || mob.isDeadOrDying()) return;
 
         mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
 
@@ -93,7 +98,7 @@ public class ViciousGoal extends Goal {
         double reach = mob instanceof AbstractHorse
                 ? HORSE_REACH_SQR
                 : Math.max(2.5, mob.getBbWidth() * 2.0 * mob.getBbWidth() * 2.0 + target.getBbWidth());
-        if (cooldown <= 0 && sees && mob.distanceToSqr(target) <= reach) {
+        if (cooldown <= 0 && sees && mob.isAlive() && mob.distanceToSqr(target) <= reach) {
             cooldown = ATTACK_COOLDOWN;
             mob.swing(InteractionHand.MAIN_HAND);
             mob.doHurtTarget(target);
