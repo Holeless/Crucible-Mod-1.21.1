@@ -77,7 +77,7 @@ public class CrucibleScreen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
             super.renderWidget(g, mouseX, mouseY, partialTick);
             int size = 8;
             int x = getX() + getWidth() - 5 - level * (size + 1);
