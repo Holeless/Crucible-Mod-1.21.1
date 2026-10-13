@@ -1,9 +1,11 @@
 package com.crucible;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
@@ -31,9 +33,26 @@ public final class CrucibleManager {
         return activeLevel == crucible;
     }
 
+    /** Earliest point we can know the crucible: before spawn chunks (and their mobs) load. */
+    @SubscribeEvent
+    public static void onLevelLoad(LevelEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel level && level.dimension() == Level.OVERWORLD) {
+            init(level);
+        }
+    }
+
+    /** Safety net, does nothing if the level load already handled it. */
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
-        ServerLevel overworld = event.getServer().overworld();
+        init(event.getServer().overworld());
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        activeLevel = 0;
+    }
+
+    private static void init(ServerLevel overworld) {
         DimensionDataStorage storage = overworld.getDataStorage();
 
         CrucibleData data = storage.get(CrucibleData.FACTORY, CrucibleData.NAME);
@@ -45,12 +64,9 @@ public final class CrucibleManager {
             storage.set(CrucibleData.NAME, data);
             data.setDirty();
         }
-        activeLevel = data.getLevel();
-        Crucible.LOGGER.info("Crucible level for this world: {}", activeLevel);
-    }
-
-    @SubscribeEvent
-    public static void onServerStopped(ServerStoppedEvent event) {
-        activeLevel = 0;
+        if (activeLevel != data.getLevel()) {
+            activeLevel = data.getLevel();
+            Crucible.LOGGER.info("Crucible level for this world: {}", activeLevel);
+        }
     }
 }
