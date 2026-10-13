@@ -1,6 +1,7 @@
 package com.crucible.client;
 
 import com.crucible.Crucible;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -20,6 +21,12 @@ public class CrucibleScreen {
     private static final ResourceLocation SKULL =
             ResourceLocation.fromNamespaceAndPath(Crucible.MOD_ID, "textures/gui/skull.png");
     private static final String[] NAMES = {"Crucible I", "Crucible II", "Crucible III"};
+
+    private static final int SKULL_SIZE = 16;   // native texture size, 1 texel = 1 GUI pixel
+    private static final int PANEL_MAX_W = 120;
+    private static final int PANEL_MIN_W = 80;
+    private static final int BOX_H = 56;
+    private static final int GAP = 6;
 
     /** Selected crucible, 1-3. Read this wherever you need it later. */
     public static int level = 1;
@@ -41,10 +48,9 @@ public class CrucibleScreen {
         }
         if (gameMode == null || difficultyButton == null) return;
 
-        // Replace the difficulty button with our own, same size and position.
+        // Hide the vanilla difficulty button; ours lives on the right.
         difficultyButton.visible = false;
-        button = new CrucibleButton(difficultyButton.getX(), difficultyButton.getY(),
-                difficultyButton.getWidth(), difficultyButton.getHeight());
+        button = new CrucibleButton();
         event.addListener(button);
 
         // Hardcore only, locked.
@@ -58,33 +64,53 @@ public class CrucibleScreen {
     @SubscribeEvent
     public static void onRender(ScreenEvent.Render.Post event) {
         if (!(event.getScreen() instanceof CreateWorldScreen screen) || button == null) return;
+
         // Only show on the tab that has the difficulty button.
         boolean onGameTab = screen.children().contains(difficultyButton);
-        button.visible = onGameTab;
-        if (!onGameTab) return;
-        button.setX(difficultyButton.getX());
-        button.setY(difficultyButton.getY());
-        button.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+
+        // Space to the right of the 310px-wide centered content.
+        int contentRight = screen.width / 2 + 155;
+        int panelX = contentRight + 10;
+        int panelW = Math.min(PANEL_MAX_W, screen.width - panelX - 10);
+        boolean fits = panelW >= PANEL_MIN_W;
+
+        button.visible = onGameTab && fits;
+        if (!button.visible) return;
+
+        int boxY = difficultyButton.getY() - 4;
+        button.setX(panelX);
+        button.setY(boxY + BOX_H + GAP);
+        button.setWidth(panelW);
+
+        GuiGraphics g = event.getGuiGraphics();
+        drawBox(g, screen, panelX, boxY, panelW, BOX_H);
+        button.render(g, event.getMouseX(), event.getMouseY(), event.getPartialTick());
+    }
+
+    /** Vanilla text-field look: grey outline, black fill. */
+    private static void drawBox(GuiGraphics g, CreateWorldScreen screen, int x, int y, int w, int h) {
+        g.fill(x, y, x + w, y + h, 0xFFA0A0A0);
+        g.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0xFF000000);
+
+        int cx = x + w / 2;
+        g.drawCenteredString(Minecraft.getInstance().font, Component.literal(NAMES[level - 1]),
+                cx, y + 8, 0xFFFFFFFF);
+
+        // Skulls drawn 1:1 so their pixels match the GUI's pixel size.
+        int spacing = 2;
+        int total = level * SKULL_SIZE + (level - 1) * spacing;
+        int sx = cx - total / 2;
+        int sy = y + h - SKULL_SIZE - 8;
+        for (int i = 0; i < level; i++) {
+            g.blit(SKULL, sx + i * (SKULL_SIZE + spacing), sy,
+                    0f, 0f, SKULL_SIZE, SKULL_SIZE, SKULL_SIZE, SKULL_SIZE);
+        }
     }
 
     private static class CrucibleButton extends Button {
-        CrucibleButton(int x, int y, int w, int h) {
-            super(x, y, w, h, Component.literal(NAMES[level - 1]),
-                    b -> {
-                        level = level % 3 + 1;
-                        b.setMessage(Component.literal(NAMES[level - 1]));
-                    }, DEFAULT_NARRATION);
-        }
-
-        @Override
-        public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-            super.renderWidget(g, mouseX, mouseY, partialTick);
-            int size = 8;
-            int x = getX() + getWidth() - 5 - level * (size + 1);
-            int y = getY() + (getHeight() - size) / 2;
-            for (int i = 0; i < level; i++) {
-                g.blit(SKULL, x + i * (size + 1), y, size, size, 0f, 0f, 16, 16, 16, 16);
-            }
+        CrucibleButton() {
+            super(0, 0, PANEL_MAX_W, 20, Component.literal("Change Crucible"),
+                    b -> level = level % 3 + 1, DEFAULT_NARRATION);
         }
     }
 }
