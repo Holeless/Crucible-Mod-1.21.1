@@ -24,7 +24,6 @@ public class CrucibleScreen {
 
     private static final int SKULL_SIZE = 16;   // native texture size, 1 texel = 1 GUI pixel
     private static final int PANEL_MAX_W = 120;
-    private static final int PANEL_MIN_W = 80;
     private static final int BOX_H = 56;
     private static final int GAP = 6;
 
@@ -67,15 +66,14 @@ public class CrucibleScreen {
 
         // Only show on the tab that has the difficulty button.
         boolean onGameTab = screen.children().contains(difficultyButton);
+        button.visible = onGameTab;
+        if (!onGameTab) return;
 
-        // Space to the right of the 310px-wide centered content.
-        int contentRight = screen.width / 2 + 155;
-        int panelX = contentRight + 10;
-        int panelW = Math.min(PANEL_MAX_W, screen.width - panelX - 10);
-        boolean fits = panelW >= PANEL_MIN_W;
-
-        button.visible = onGameTab && fits;
-        if (!button.visible) return;
+        // Right edge of the real buttons, then use the space beyond it.
+        int contentRight = difficultyButton.getX() + difficultyButton.getWidth();
+        int panelX = contentRight + 8;
+        int panelW = Math.max(60, Math.min(PANEL_MAX_W, screen.width - panelX - 6));
+        panelX = Math.min(panelX, screen.width - panelW - 4);
 
         int boxY = difficultyButton.getY() - 4;
         button.setX(panelX);
@@ -83,12 +81,12 @@ public class CrucibleScreen {
         button.setWidth(panelW);
 
         GuiGraphics g = event.getGuiGraphics();
-        drawBox(g, screen, panelX, boxY, panelW, BOX_H);
+        drawBox(g, panelX, boxY, panelW, BOX_H);
         button.render(g, event.getMouseX(), event.getMouseY(), event.getPartialTick());
     }
 
     /** Vanilla text-field look: grey outline, black fill. */
-    private static void drawBox(GuiGraphics g, CreateWorldScreen screen, int x, int y, int w, int h) {
+    private static void drawBox(GuiGraphics g, int x, int y, int w, int h) {
         g.fill(x, y, x + w, y + h, 0xFFA0A0A0);
         g.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0xFF000000);
 
