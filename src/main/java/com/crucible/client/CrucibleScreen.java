@@ -62,7 +62,8 @@ public class CrucibleScreen {
                     {"Nocturne", "Phantoms always spawn at night regardless of sleep and in caves like bats."},
                     {"Relentless", "Mob follow range doubled; mobs keep tracking your last known position after losing sight."},
                     {"Vigilance", "Mob detection range doubled."},
-                    {"Marksman", "Skeletons have a higher chance to spawn with a randomly enchanted bow."}
+                    {"Marksman", "Skeletons have a higher chance to spawn with a randomly enchanted bow."},
+                    {"Vicious", "Passive mobs are neutral and attack as a group if provoked."}
             }),
             new Section("Players:", new String[][]{
                     {"Famine", "Hunger drains faster."},
