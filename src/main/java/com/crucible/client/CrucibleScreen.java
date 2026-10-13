@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
@@ -32,6 +33,7 @@ public class CrucibleScreen {
 
     private static final int SKULL_SIZE = 16;   // native texture size, 1 texel = 1 GUI pixel
     private static final int BOX_H = 56;
+    private static final int BUTTON_H = 20;
     private static final int GAP = 6;
     private static final int LEFT_MARGIN = 8;
     private static final int RIGHT_MARGIN = 8;
@@ -74,9 +76,9 @@ public class CrucibleScreen {
 
     private static CrucibleButton button;
     private static CycleButton<?> difficultyButton;
-    private static CycleButton<?> commandsButton;
 
-    // effects panel geometry (set every frame) + scroll state
+    // layout, recomputed every frame
+    private static int selX, selY, selW;
     private static int effX, effY, effW, effH;
     private static int scroll = 0;
     private static int maxScroll = 0;
@@ -87,28 +89,34 @@ public class CrucibleScreen {
 
         button = null;
         CycleButton<?> gameMode = null;
+        CycleButton<?> commands = null;
         difficultyButton = null;
-        commandsButton = null;
         for (GuiEventListener child : screen.children()) {
             if (child instanceof CycleButton<?> cb) {
                 if (cb.getValue() instanceof WorldCreationUiState.SelectedGameMode) gameMode = cb;
                 else if (cb.getValue() instanceof Difficulty) difficultyButton = cb;
-                else if (cb.getValue() instanceof Boolean) commandsButton = cb;
+                else if (cb.getValue() instanceof Boolean) commands = cb;
             }
         }
         if (gameMode == null || difficultyButton == null) return;
 
-        // Hide the vanilla difficulty button; the crucible panels replace it.
-        difficultyButton.visible = false;
+        // Hardcore-only and no cheats, so none of these three need to be visible or clickable.
+        for (CycleButton<?> cb : new CycleButton<?>[]{gameMode, difficultyButton, commands}) {
+            if (cb != null) {
+                cb.visible = false;
+                cb.active = false;
+            }
+        }
+
         scroll = 0;
         button = new CrucibleButton();
         event.addListener(button);
 
-        // Hardcore only, locked.
         WorldCreationUiState state = screen.getUiState();
         final CycleButton<?> lockedMode = gameMode;
         state.addListener(s -> lockedMode.active = false);
         state.setGameMode(WorldCreationUiState.SelectedGameMode.HARDCORE);
+        state.setAllowCommands(false);
         lockedMode.active = false;
     }
 
@@ -117,7 +125,7 @@ public class CrucibleScreen {
     public static void onRenderPre(ScreenEvent.Render.Pre event) {
         if (!(event.getScreen() instanceof CreateWorldScreen screen) || button == null) return;
 
-        // 1) Push all of the current tab's vanilla widgets (game / world / more) to the left edge.
+        // 1) Push the current tab's vanilla widgets to the left edge.
         int minX = Integer.MAX_VALUE;
         List<AbstractWidget> tabWidgets = new ArrayList<>();
         for (GuiEventListener c : screen.children()) {
@@ -131,52 +139,56 @@ public class CrucibleScreen {
             if (dx != 0) for (AbstractWidget w : tabWidgets) w.setX(w.getX() + dx);
         }
 
-        boolean onGameTab = screen.children().contains(difficultyButton);
-        button.visible = onGameTab;
-        if (!onGameTab) return;
+        // 2) Left column width = widest vanilla widget on this tab.
+        int leftRight = LEFT_MARGIN + 210;
+        EditBox nameBox = null;
+        for (AbstractWidget w : tabWidgets) {
+            leftRight = Math.max(leftRight, w.getX() + w.getWidth());
+            if (w instanceof EditBox eb && nameBox == null) nameBox = eb;
+        }
 
-        // 2) Close the gap left by the hidden difficulty button.
-        if (commandsButton != null) commandsButton.setY(difficultyButton.getY());
-
-        // 3) Panels in the space to the right of the vanilla column: center (selector), right (effects).
-        int x0 = difficultyButton.getX() + difficultyButton.getWidth() + 12;
-        int total = screen.width - RIGHT_MARGIN - x0;
-        int centerW = Mth.clamp(total * 2 / 5, 70, 110);
-        int centerX = x0;
-
-        effX = centerX + centerW + GAP;
+        // 3) Effects panel fills everything to the right of the left column, on every tab.
+        effX = leftRight + 12;
         effW = Math.max(60, screen.width - RIGHT_MARGIN - effX);
         effY = PANEL_TOP;
         effH = Math.max(40, screen.height - FOOTER_H - 8 - effY);
 
-        button.setX(centerX);
-        button.setY(PANEL_TOP + BOX_H + GAP);
-        button.setWidth(centerW);
+        // 4) Selector sits directly under the world name field (Game tab only).
+        boolean onGameTab = screen.children().contains(difficultyButton);
+        button.visible = onGameTab;
+        if (!onGameTab) return;
 
-        // stash for the draw pass
-        centerBoxX = centerX;
-        centerBoxW = centerW;
+        if (nameBox != null) {
+            selX = nameBox.getX();
+            selW = nameBox.getWidth();
+            selY = nameBox.getY() + nameBox.getHeight() + GAP + 2;
+        } else {
+            selX = LEFT_MARGIN;
+            selW = leftRight - LEFT_MARGIN;
+            selY = PANEL_TOP;
+        }
+        button.setX(selX);
+        button.setY(selY + BOX_H + GAP);
+        button.setWidth(selW);
     }
-
-    private static int centerBoxX, centerBoxW;
 
     @SubscribeEvent
     public static void onRender(ScreenEvent.Render.Post event) {
-        if (!(event.getScreen() instanceof CreateWorldScreen) || button == null || !button.visible) return;
+        if (!(event.getScreen() instanceof CreateWorldScreen) || button == null) return;
 
         GuiGraphics g = event.getGuiGraphics();
 
-        // center: crucible selector
-        drawSelector(g, centerBoxX, PANEL_TOP, centerBoxW, BOX_H);
-        button.render(g, event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        if (button.visible) {
+            drawSelector(g, selX, selY, selW, BOX_H);
+            button.render(g, event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        }
 
-        // right: effects
         drawEffects(g, effX, effY, effW, effH);
     }
 
     @SubscribeEvent
     public static void onScroll(ScreenEvent.MouseScrolled.Pre event) {
-        if (!(event.getScreen() instanceof CreateWorldScreen) || button == null || !button.visible) return;
+        if (!(event.getScreen() instanceof CreateWorldScreen) || button == null) return;
         double mx = event.getMouseX(), my = event.getMouseY();
         if (mx >= effX && mx < effX + effW && my >= effY && my < effY + effH) {
             scroll = Mth.clamp(scroll - (int) (event.getScrollDeltaY() * 12), 0, maxScroll);
@@ -217,7 +229,6 @@ public class CrucibleScreen {
         int pad = 5;
         int wrapW = w - pad * 2 - 4; // leave room for the scrollbar
 
-        // Build wrapped lines
         List<Line> lines = new ArrayList<>();
         int cy = 0;
         Section[] sections = EFFECTS[level - 1];
@@ -260,7 +271,6 @@ public class CrucibleScreen {
         }
         g.disableScissor();
 
-        // Scrollbar
         if (maxScroll > 0) {
             int bx = x + w - 5;
             int trackTop = y + 2, trackH = h - 4;
@@ -273,7 +283,7 @@ public class CrucibleScreen {
 
     private static class CrucibleButton extends Button {
         CrucibleButton() {
-            super(0, 0, 100, 20, Component.literal("Change Crucible"),
+            super(0, 0, 100, BUTTON_H, Component.literal("Change Crucible"),
                     b -> {
                         level = level % 3 + 1;
                         scroll = 0;
