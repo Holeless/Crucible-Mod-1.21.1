@@ -25,6 +25,7 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Vicious: passive mobs (animals, villagers, fish, ...) are neutral. Hurt or kill one and every other
@@ -35,6 +36,9 @@ import java.util.List;
 @EventBusSubscriber(modid = Crucible.MOD_ID)
 public final class Vicious {
     private static final double ATTACK_DAMAGE = 3.0;
+    private static final double FISH_ATTACK_DAMAGE = 2.0; // 1 heart
+    private static final Set<EntityType<?>> FISH = Set.of(
+            EntityType.COD, EntityType.SALMON, EntityType.TROPICAL_FISH, EntityType.PUFFERFISH);
     private static final double ALERT_RADIUS = 16.0;
     private static final double ALERT_HEIGHT = 10.0;
 
@@ -43,7 +47,8 @@ public final class Vicious {
     /** Mod-bus: most passive mobs have no attack attributes, and attacking without them would crash. */
     public static void onAttributes(EntityAttributeModificationEvent event) {
         for (EntityType<? extends LivingEntity> type : event.getTypes()) {
-            if (!event.has(type, Attributes.ATTACK_DAMAGE)) event.add(type, Attributes.ATTACK_DAMAGE, ATTACK_DAMAGE);
+            double damage = FISH.contains(type) ? FISH_ATTACK_DAMAGE : ATTACK_DAMAGE;
+            if (!event.has(type, Attributes.ATTACK_DAMAGE)) event.add(type, Attributes.ATTACK_DAMAGE, damage);
             if (!event.has(type, Attributes.ATTACK_KNOCKBACK)) event.add(type, Attributes.ATTACK_KNOCKBACK);
         }
     }
