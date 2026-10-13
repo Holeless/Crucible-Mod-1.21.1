@@ -32,6 +32,8 @@ import java.util.Set;
  * mob of the same type nearby turns on you, like a wolf pack.
  *
  * Tamed pets, golems and mobs that are already hostile or neutral are left alone.
+ * Horses (and donkeys, mules, llamas) are fast and tough, so they get a much smaller alert radius and
+ * give up the chase sooner (see {@link ViciousGoal}).
  */
 @EventBusSubscriber(modid = Crucible.MOD_ID)
 public final class Vicious {
@@ -40,6 +42,7 @@ public final class Vicious {
     private static final Set<EntityType<?>> FISH = Set.of(
             EntityType.COD, EntityType.SALMON, EntityType.TROPICAL_FISH, EntityType.PUFFERFISH);
     private static final double ALERT_RADIUS = 16.0;
+    private static final double HORSE_ALERT_RADIUS = 6.0;
     private static final double ALERT_HEIGHT = 10.0;
 
     private Vicious() {}
@@ -91,9 +94,10 @@ public final class Vicious {
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         if (player.isCreative() || player.isSpectator()) return;
 
+        double radius = victim instanceof AbstractHorse ? HORSE_ALERT_RADIUS : ALERT_RADIUS;
         List<Mob> pack = victim.level().getEntitiesOfClass(
                 Mob.class,
-                victim.getBoundingBox().inflate(ALERT_RADIUS, ALERT_HEIGHT, ALERT_RADIUS),
+                victim.getBoundingBox().inflate(radius, ALERT_HEIGHT, radius),
                 m -> m.getType() == victim.getType() && m.isAlive() && !m.isBaby() && isPassive(m));
         for (Mob mob : pack) {
             mob.setTarget(player);

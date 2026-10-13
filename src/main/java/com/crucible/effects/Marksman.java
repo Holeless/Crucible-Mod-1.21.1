@@ -24,12 +24,12 @@ import java.util.stream.Collectors;
  * Marksman: skeletons have a higher chance to spawn with a randomly enchanted bow.
  *
  * Each skeleton is rolled once, the first time it enters the world. A skeleton holding a plain bow has a
- * 60% chance to have it enchanted with 1-3 random, compatible, non-treasure, non-curse bow enchantments
- * at random levels. Skeletons that vanilla already enchanted are left alone.
+ * 75% chance (3x vanilla's 25% base) to have it enchanted with 1-3 random, compatible, non-treasure,
+ * non-curse bow enchantments at random levels. Skeletons that vanilla already enchanted are left alone.
  */
 @EventBusSubscriber(modid = Crucible.MOD_ID)
 public final class Marksman {
-    private static final float CHANCE = 0.6F;
+    private static final float CHANCE = 0.75F;
     private static final String ROLLED_KEY = "crucible_marksman_rolled";
 
     private Marksman() {}

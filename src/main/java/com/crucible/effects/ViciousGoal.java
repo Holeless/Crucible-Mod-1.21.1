@@ -8,6 +8,7 @@ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ambient.Bat;
 import net.minecraft.world.entity.animal.Squid;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
@@ -15,19 +16,26 @@ import java.util.EnumSet;
 /**
  * Makes an angered passive mob chase and bite its target. Highest priority, so it overrides panic/flee goals.
  * The target itself is set by {@link Vicious} when the pack is alerted.
+ *
+ * Horses use a shorter leash, give up sooner and chase at normal speed, so you can get away from them.
  */
 public class ViciousGoal extends Goal {
-    private static final double MAX_DISTANCE_SQR = 32.0 * 32.0;
-    private static final int GIVE_UP_TICKS = 200; // 10 seconds without line of sight
     private static final int ATTACK_COOLDOWN = 20;
 
     private final Mob mob;
+    private final double maxDistanceSqr;
+    private final int giveUpTicks;     // ticks without line of sight before it gives up
+    private final double chaseSpeed;
     private int cooldown;
     private int unseen;
     private int repath;
 
     public ViciousGoal(Mob mob) {
         this.mob = mob;
+        boolean horse = mob instanceof AbstractHorse;
+        this.maxDistanceSqr = horse ? 12.0 * 12.0 : 32.0 * 32.0;
+        this.giveUpTicks = horse ? 60 : 200;
+        this.chaseSpeed = horse ? 1.0D : 1.4D;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -44,7 +52,7 @@ public class ViciousGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return canUse() && unseen < GIVE_UP_TICKS && mob.distanceToSqr(mob.getTarget()) < MAX_DISTANCE_SQR;
+        return canUse() && unseen < giveUpTicks && mob.distanceToSqr(mob.getTarget()) < maxDistanceSqr;
     }
 
     @Override
@@ -115,7 +123,7 @@ public class ViciousGoal extends Goal {
 
         if (--repath <= 0) {
             repath = 4;
-            mob.getNavigation().moveTo(target, 1.4D);
+            mob.getNavigation().moveTo(target, chaseSpeed);
         }
     }
 }
