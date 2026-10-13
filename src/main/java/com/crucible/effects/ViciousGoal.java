@@ -17,25 +17,22 @@ import java.util.EnumSet;
  * Makes an angered passive mob chase and bite its target. Highest priority, so it overrides panic/flee goals.
  * The target itself is set by {@link Vicious} when the pack is alerted.
  *
- * Horses use a shorter leash, give up sooner and chase at normal speed, so you can get away from them.
+ * Horses are big, and vanilla's reach formula scales with body width, so they would bite from almost 3 blocks
+ * away. They use a short fixed reach instead, so you can hit them first.
  */
 public class ViciousGoal extends Goal {
+    private static final double MAX_DISTANCE_SQR = 32.0 * 32.0;
+    private static final int GIVE_UP_TICKS = 200; // 10 seconds without line of sight
     private static final int ATTACK_COOLDOWN = 20;
+    private static final double HORSE_REACH_SQR = 2.0 * 2.0; // centre-to-centre, about 1 block between bodies
 
     private final Mob mob;
-    private final double maxDistanceSqr;
-    private final int giveUpTicks;     // ticks without line of sight before it gives up
-    private final double chaseSpeed;
     private int cooldown;
     private int unseen;
     private int repath;
 
     public ViciousGoal(Mob mob) {
         this.mob = mob;
-        boolean horse = mob instanceof AbstractHorse;
-        this.maxDistanceSqr = horse ? 12.0 * 12.0 : 32.0 * 32.0;
-        this.giveUpTicks = horse ? 60 : 200;
-        this.chaseSpeed = horse ? 1.0D : 1.4D;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -52,7 +49,7 @@ public class ViciousGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return canUse() && unseen < giveUpTicks && mob.distanceToSqr(mob.getTarget()) < maxDistanceSqr;
+        return canUse() && unseen < GIVE_UP_TICKS && mob.distanceToSqr(mob.getTarget()) < MAX_DISTANCE_SQR;
     }
 
     @Override
@@ -93,7 +90,9 @@ public class ViciousGoal extends Goal {
         chase(target);
 
         if (cooldown > 0) cooldown--;
-        double reach = Math.max(2.5, mob.getBbWidth() * 2.0 * mob.getBbWidth() * 2.0 + target.getBbWidth());
+        double reach = mob instanceof AbstractHorse
+                ? HORSE_REACH_SQR
+                : Math.max(2.5, mob.getBbWidth() * 2.0 * mob.getBbWidth() * 2.0 + target.getBbWidth());
         if (cooldown <= 0 && sees && mob.distanceToSqr(target) <= reach) {
             cooldown = ATTACK_COOLDOWN;
             mob.swing(InteractionHand.MAIN_HAND);
@@ -123,7 +122,7 @@ public class ViciousGoal extends Goal {
 
         if (--repath <= 0) {
             repath = 4;
-            mob.getNavigation().moveTo(target, chaseSpeed);
+            mob.getNavigation().moveTo(target, 1.4D);
         }
     }
 }
