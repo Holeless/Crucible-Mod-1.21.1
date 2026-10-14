@@ -28,17 +28,26 @@ import java.util.EnumSet;
  *
  * Runs only when the Enderman has a player target and is either far away or has no complete walking route to them.
  *
- *  1. Teleport: jumps to a free spot 3-8 blocks from the player (every 2 seconds, up to twice in a row).
- *  2. Walk: if it is far but a route exists and teleporting is not working, it just pathfinds.
- *  3. Dig: if there is no route and teleporting failed (no free space near the player), it tunnels straight toward
- *     them. It mines the blocks in front of it (3 high, so it fits) one at a time, holds the block it picked up,
+ *  0. Grace period: for the first {@link #INITIAL_DELAY} ticks it only walks toward the player.
+ *  1. Teleport (every {@link #TELEPORT_COOLDOWN} ticks): if it is far away it lands 16-24 blocks from the player and
+ *     walks the rest; if it has no route it lands 6-12 blocks away, at most twice.
+ *  2. Walk: if a route exists it just pathfinds.
+ *  3. Dig: if there is no route and teleporting did not help (no free space, or it keeps landing outside the
+ *     walls), it tunnels straight toward them. It mines the blocks in front of it (3 high, so it fits) one at a time, holds the block it picked up,
  *     then sets it down somewhere beside or behind itself, out of the tunnel, and carries on. Blocks it cannot
  *     break (bedrock, hardness above {@link #MAX_HARDNESS}, containers) stop the dig. Needs mobGriefing.
  */
 public class OmniscienceEndermanGoal extends Goal {
-    private static final double FAR_SQR = 24.0 * 24.0;
+    // Tuning knobs. Raise the delays / distances to make Endermen slower to reach you.
+    private static final double FAR_SQR = 40.0 * 40.0;      // farther than this and the goal takes over
+    private static final int INITIAL_DELAY = 300;           // ticks (15 s) of plain walking before any teleport or dig
+    private static final int TELEPORT_COOLDOWN = 200;       // ticks (10 s) between teleports
+    private static final double FAR_LAND_MIN = 16.0;        // teleport because it is far: lands this far from you,
+    private static final double FAR_LAND_MAX = 24.0;        //   so it still has to walk the rest
+    private static final double BLOCKED_LAND_MIN = 6.0;     // teleport because it has no route to you
+    private static final double BLOCKED_LAND_MAX = 12.0;
+    private static final int MAX_BLOCKED_TELEPORTS = 2;     // then it gives up teleporting and digs
     private static final int CHECK_INTERVAL = 20;
-    private static final int TELEPORT_COOLDOWN = 40;
     private static final int MAX_TELEPORT_FAILS = 2;
     private static final int TELEPORT_ATTEMPTS = 8;
     private static final float MAX_HARDNESS = 10.0F;
@@ -50,6 +59,8 @@ public class OmniscienceEndermanGoal extends Goal {
     private int nextCheck;
     private int teleportCooldown;
     private int teleportFails;
+    private int blockedTeleports;
+    private int huntTicks;
     private int repath;
 
     private BlockPos breaking;
@@ -77,6 +88,7 @@ public class OmniscienceEndermanGoal extends Goal {
         }
         Path path = mob.getNavigation().createPath(player, 0);
         blocked = path == null || !path.canReach();
+        if (!blocked) blockedTeleports = 0;
     }
 
     @Override
@@ -106,6 +118,8 @@ public class OmniscienceEndermanGoal extends Goal {
     public void start() {
         repath = 0;
         breakTicks = 0;
+        huntTicks = 0;
+        blockedTeleports = 0;
     }
 
     @Override
@@ -129,12 +143,23 @@ public class OmniscienceEndermanGoal extends Goal {
             return;
         }
 
-        boolean far = mob.distanceToSqr(player) > FAR_SQR;
+        // Grace period: it just walks toward you (if it can) before any teleporting or digging starts.
+        if (++huntTicks < INITIAL_DELAY) {
+            if (!blocked) walkToward(player);
+            return;
+        }
 
-        if ((far || blocked) && teleportCooldown <= 0 && teleportFails < MAX_TELEPORT_FAILS) {
+        boolean far = mob.distanceToSqr(player) > FAR_SQR;
+        boolean teleportsExhausted = teleportFails >= MAX_TELEPORT_FAILS
+                || (blocked && blockedTeleports >= MAX_BLOCKED_TELEPORTS);
+
+        if ((far || blocked) && teleportCooldown <= 0 && !teleportsExhausted) {
             teleportCooldown = TELEPORT_COOLDOWN;
-            if (teleportNear(player)) {
+            boolean landFar = !blocked;
+            if (teleportNear(player, landFar ? FAR_LAND_MIN : BLOCKED_LAND_MIN,
+                    landFar ? FAR_LAND_MAX : BLOCKED_LAND_MAX)) {
                 teleportFails = 0;
+                if (blocked) blockedTeleports++;
                 nextCheck = mob.tickCount; // look at the new situation right away
                 return;
             }
@@ -142,7 +167,7 @@ public class OmniscienceEndermanGoal extends Goal {
         }
 
         if (blocked) {
-            if (teleportFails >= MAX_TELEPORT_FAILS) dig(player);
+            if (teleportsExhausted) dig(player);
         } else {
             walkToward(player);
         }
@@ -155,7 +180,7 @@ public class OmniscienceEndermanGoal extends Goal {
         if (path != null) mob.getNavigation().moveTo(path, 1.0D);
     }
 
-    private boolean teleportNear(Player player) {
+    private boolean teleportNear(Player player, double minRadius, double maxRadius) {
         Level level = mob.level();
         double ox = mob.getX();
         double oy = mob.getY();
@@ -164,7 +189,7 @@ public class OmniscienceEndermanGoal extends Goal {
 
         for (int i = 0; i < TELEPORT_ATTEMPTS; i++) {
             double angle = random.nextDouble() * Math.PI * 2.0;
-            double radius = 3.0 + random.nextDouble() * 5.0;
+            double radius = minRadius + random.nextDouble() * (maxRadius - minRadius);
             double x = player.getX() + Math.cos(angle) * radius;
             double z = player.getZ() + Math.sin(angle) * radius;
             double y = player.getY() + (i % 3); // randomTeleport slides down to the ground from here
