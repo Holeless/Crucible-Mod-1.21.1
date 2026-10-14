@@ -59,6 +59,7 @@ public class CrucibleScreen {
                             + "they also hide behind structures and other mobs when attacking and between attacks."},
                     {"Extrication", "Hostile mobs can break boats, minecarts, and doors."},
                     {"Snare", "Spiders try to trap you with webbing."},
+                    {"Blackout", "Hostile mobs break light sources."},
                     {"Nocturne", "Phantoms always spawn at night regardless of sleep and in caves like bats."},
                     {"Relentless", "Mob follow range doubled; mobs keep tracking your last known position after losing sight."},
                     {"Vigilance", "Mob detection range doubled."},
