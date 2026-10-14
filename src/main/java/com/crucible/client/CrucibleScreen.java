@@ -43,7 +43,7 @@ public class CrucibleScreen {
     private static final int LINE_H = 9;
 
     // ---------------------------------------------------------------------
-    // Effect text. Add Crucible II / III by filling in the other slots.
+    // Effect text. Add Crucible III by filling in the last slot.
     // Each section: { title, { {name, description}, ... } }
     // ---------------------------------------------------------------------
     private record Section(String title, String[][] effects) {}
@@ -72,7 +72,42 @@ public class CrucibleScreen {
             })
     };
 
-    private static final Section[][] EFFECTS = {CRUCIBLE_1, null, null};
+    private static final Section[] CRUCIBLE_2 = {
+            new Section("World:", new String[][]{
+                    {"Eclipse", "Nights last for twice as long."}
+            }),
+            new Section("Entities:", new String[][]{
+                    {"Leviathans", "Guardians have a chance to spawn in the oceans, lakes, and rivers; "
+                            + "Elder Guardians have a chance to spawn in the ocean."},
+                    {"Fortified", "Villages spawn with 3 Iron Golems; Iron Golems maneuver away from pillars "
+                            + "and take cover from ranged attacks if you are not reachable."},
+                    {"Feral", "Passive and neutral mobs are fully hostile."},
+                    {"Murk", "Squids blind you when attacking."},
+                    {"Tempest", "Every drowned has a riptide trident and uses it to close in. "
+                            + "They also swim faster and throw tridents from further."},
+                    {"Breach", "Endermen move placed blocks and build pathways for mobs to get to you; "
+                            + "Creepers explode allowing mobs to get to you."},
+                    {"Deathless", "Zombies, Husks, Drowned, and Skeletons have a chance to spawn with a totem "
+                            + "of undying in their off-hand."},
+                    {"Omniscience", "Mobs have infinite follow and detection range. Creepers will explode to lead "
+                            + "pathways to you, Endermen will tunnel to you."},
+                    {"Hive", "Bees spawn more often and don't sleep at night."},
+                    {"Gnawing", "Pigs, Cows and Sheep chew through blocks you place with stone tool speed."},
+                    {"Warlock", "Witches buff other mobs with splash potions, have improved throwing range, "
+                            + "can throw potions of lingering, and have an increased spawn rate."},
+                    {"Unmasked", "Endermen ignore pumpkins."},
+                    {"Ordnance", "Skeletons have a chance to fire arrows of harming, withering, or poison; "
+                            + "Pillagers have a chance to fire fireworks."},
+                    {"Deadeye", "Skeletons will target feet or aim for your back when you are using a shield."},
+                    {"Advection", "Mobs have a chance to spawn with a bucket of water or bucket of lava "
+                            + "and will strategically place it."},
+                    {"Pyromania", "Zombies, Husks, and Drowned have a chance to spawn with flint and steel. "
+                            + "Endermen have a chance to spawn with TNT and will strategically place it; "
+                            + "Mobs with flint and steel prioritize TNT."}
+            })
+    };
+
+    private static final Section[][] EFFECTS = {CRUCIBLE_1, CRUCIBLE_2, null};
 
     /** Selected crucible, 1-3. Mirrored into CrucibleManager.pendingLevel for the server side. */
     public static int level = 1;
