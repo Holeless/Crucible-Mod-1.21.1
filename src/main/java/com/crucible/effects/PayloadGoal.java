@@ -1,10 +1,12 @@
 package com.crucible.effects;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Phantom;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
@@ -16,6 +18,9 @@ import java.util.List;
  *
  * Phantoms steer by {@code moveTargetPoint} (made public by the access transformer), not by the usual wanted
  * position, so that is what this goal sets every tick.
+ *
+ * The drop only happens once the phantom is overhead AND has reached the intended altitude. The altitude is
+ * capped by the headroom above the player, so it also works in caves.
  */
 public class PayloadGoal extends Goal {
     private static final double SEARCH_RADIUS = 20.0;   // blocks around the phantom to look for a creeper
@@ -26,9 +31,11 @@ public class PayloadGoal extends Goal {
     private static final int PICKUP_TIMEOUT = 200;
     private static final int CARRY_TIMEOUT = 600;
     private static final double GRAB_DIST_SQR = 2.5 * 2.5;
-    private static final double DROP_HEIGHT = 12.0;     // flies this far above the player
-    private static final double MIN_DROP_HEIGHT = 6.0;  // lets go once at least this high and overhead
-    private static final double DROP_RADIUS_SQR = 3.0 * 3.0;
+    private static final double DROP_HEIGHT = 12.0;     // max height above the player to drop from
+    private static final double MIN_CAVE_HEIGHT = 3.0;  // lowest drop height when there is a ceiling
+    private static final double HEIGHT_TOLERANCE = 1.5; // counts as "high enough" within this of the target
+    private static final double DROP_RADIUS_SQR = 4.0 * 4.0;
+    private static final int STALL_TICKS = 200;         // carrying this long and overhead: just drop
 
     private enum Phase { PICKUP, CARRY }
 
@@ -137,15 +144,31 @@ public class PayloadGoal extends Goal {
         }
 
         // CARRY: climb and fly to a point above the player.
-        phantom.moveTargetPoint = new Vec3(victim.getX(), victim.getY() + DROP_HEIGHT, victim.getZ());
+        double dropH = dropHeight(victim);
+        phantom.moveTargetPoint = new Vec3(victim.getX(), victim.getY() + dropH, victim.getZ());
 
         double dx = phantom.getX() - victim.getX();
         double dz = phantom.getZ() - victim.getZ();
         boolean overhead = dx * dx + dz * dz < DROP_RADIUS_SQR;
-        if (overhead && phantom.getY() - victim.getY() >= MIN_DROP_HEIGHT) {
+        boolean high = phantom.getY() - victim.getY() >= dropH - HEIGHT_TOLERANCE;
+        // Fallback: if it has been trying a long time and is overhead, just drop.
+        boolean stalled = ticks > STALL_TICKS && overhead;
+        if (overhead && (high || stalled)) {
             release();
             done = true;
         }
+    }
+
+    /** How high above the player to drop from: up to DROP_HEIGHT, less if there is a ceiling. */
+    private double dropHeight(Player p) {
+        Level level = phantom.level();
+        BlockPos.MutableBlockPos pos = p.blockPosition().mutable();
+        int free = 0;
+        while (free < (int) DROP_HEIGHT
+                && level.getBlockState(pos.move(0, 1, 0)).getCollisionShape(level, pos).isEmpty()) {
+            free++;
+        }
+        return Math.max(MIN_CAVE_HEIGHT, free - 1);
     }
 
     private void release() {
