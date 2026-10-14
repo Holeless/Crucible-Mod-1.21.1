@@ -44,7 +44,7 @@ import java.util.function.Predicate;
  * proportion to this number.
  *
  * Getting to you: see {@link OmniscienceCreeperGoal} (creepers blow tunnels) and {@link OmniscienceEndermanGoal}
- * (Endermen teleport, walk, or dig).
+ * (Endermen tunnel to you; they never teleport to you).
  *
  * Neutral mobs (wolves, iron golems, ...) are made hostile by {@link Feral}, which uses the same unlimited range.
  */
